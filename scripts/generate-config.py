@@ -5,8 +5,12 @@ Every secret is produced with the exact byte/character length the protocol
 requires, so the rendered config is directly usable.
 
 Usage:
-    python3 scripts/generate-config.py --output /etc/sing-box/config.json
-    python3 scripts/generate-config.py --output out.json --tailscale-key tskey-xxx
+    python3 scripts/generate-config.py --output /etc/sing-box/config.json \\
+        --host relay.example.com --tailscale-hostname my-node
+
+The script also writes a client-info file (mode 0600) next to the config,
+holding the REALITY public key and every credential the client needs. That
+keeps the deployment self-contained: nothing has to be scraped from stderr.
 """
 from __future__ import annotations
 
@@ -103,19 +107,75 @@ def build(args):
 
     left = [ln for ln in template.splitlines() if "%%" in ln]
     if left:
-        raise SystemExit("unrendered placeholders remain:\n" + "\n".join(left))
+        raise SystemExit("unrendered placeholders remain: " + ", ".join(left))
 
     cfg = json.loads(template)
     return cfg, pub
 
 
+def write_client_info(cfg, pub: str, path: Path, host: str) -> None:
+    """Persist what the client needs so it never has to be scraped from
+    stderr or re-derived later. Contains secrets: written mode 0600."""
+    lines = [
+        "sing-box client information",
+        "=" * 60,
+        "",
+        "REALITY public key (deliberately not stored in config.json):",
+        "  " + pub,
+        "",
+        "Host to dial: " + (host or "<pass --host, or use this server public IP>"),
+        "",
+    ]
+
+    for ib in cfg.get("inbounds", []):
+        kind = ib.get("type")
+        lines.append(kind + " inbound, port " + str(ib.get("listen_port")))
+        for user in ib.get("users", []):
+            if "uuid" in user:
+                lines.append("  uuid  : " + user["uuid"])
+            if "password" in user:
+                lines.append("  pass  : " + user["password"])
+            if user.get("flow"):
+                lines.append("  flow  : " + user["flow"])
+        if "password" in ib:
+            lines.append("  pass  : " + ib["password"])
+            lines.append("  method: " + ib["method"])
+        tls = ib.get("tls") or {}
+        reality = tls.get("reality") or {}
+        if tls.get("enabled"):
+            names = tls.get("server_name") or ",".join(reality.get("serverNames") or [])
+            if names:
+                lines.append("  sni   : " + names)
+        if reality.get("enabled"):
+            lines.append("  pbk   : " + pub)
+            for sid in reality.get("short_id", []):
+                lines.append("  sid   : " + sid)
+            lines.append("  fp    : chrome")
+        lines.append("")
+
+    lines += [
+        "Generate share links and QR codes:",
+        "  python3 scripts/export-subscription.py "
+        "--config <config.json> --host <domain> "
+        "--public-key " + pub + " --out-dir ./sub",
+        "",
+    ]
+
+    path.write_text(chr(10).join(lines), encoding="utf-8")
+    os.chmod(path, 0o600)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="Generate sing-box server config")
     p.add_argument("--output", "-o", required=True, help="path to write config.json")
+    p.add_argument("--host", default="",
+                   help="domain or public IP clients dial; recorded in client-info")
+    p.add_argument("--client-info", default="",
+                   help="path for client credentials (default: <output>.client.txt)")
     p.add_argument("--tailscale-hostname", default="singbox-node",
                    help="Tailscale hostname for the embedded endpoint")
     p.add_argument("--tailscale-key", default="",
-                   help="Tailscale auth key (leave empty to log in later)")
+                   help="Tailscale auth key (empty means do not join a tailnet)")
     p.add_argument("--vless-uuid", default="")
     p.add_argument("--reality-private-key", default="")
     p.add_argument("--reality-short-id", default="")
@@ -128,13 +188,17 @@ def main() -> int:
     cfg, pub = build(args)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    out.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
     os.chmod(out, 0o600)
 
+    info = Path(args.client_info) if args.client_info else out.with_suffix(".client.txt")
+    write_client_info(cfg, pub, info, args.host)
+
     print("wrote " + str(out), file=sys.stderr)
+    print("wrote " + str(info) + " (client credentials, mode 0600)", file=sys.stderr)
     print("", file=sys.stderr)
     print("REALITY public key: " + pub, file=sys.stderr)
-    print("keep that public key for the client configuration", file=sys.stderr)
+    print("it is also in " + str(info), file=sys.stderr)
     return 0
 
 

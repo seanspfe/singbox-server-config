@@ -72,11 +72,22 @@ sudo chmod 700 /var/lib/sing-box
 sudo apt install -y python3-pip
 pip install --break-system-packages cryptography   # or use a venv
 sudo python3 scripts/generate-config.py --output /etc/sing-box/config.json \
-     --tailscale-hostname "$(hostname -s)"
+     --host "$DOMAIN" --tailscale-hostname "$(hostname -s)"
 ```
 
-The script prints the **REALITY public key** on stderr. Copy it — the client
-needs it, and it is deliberately not written into the config file.
+This writes **two** files:
+
+| File | Contents |
+|---|---|
+| `/etc/sing-box/config.json` | the server config, mode `0600` |
+| `/etc/sing-box/config.client.txt` | REALITY public key and every client credential, mode `0600` |
+
+The client file exists so the deployment is self-contained: whoever configures
+the phone or laptop reads one file instead of scraping console output. It
+contains live secrets — keep it at `0600` and do not commit it.
+
+`--host` is recorded in that file and written into the share links. Pass the
+domain from step 0.
 
 Then lock the file down:
 
@@ -182,10 +193,13 @@ A missing listener means that inbound was rejected — re-read `journalctl`.
 pip install --break-system-packages segno
 python3 scripts/export-subscription.py \
     --config /etc/sing-box/config.json \
-    --host "$DOMAIN" \
-    --public-key "<REALITY_PUBLIC_KEY from step 3>" \
+    --client-info /etc/sing-box/config.client.txt \
     --out-dir ./sub
 ```
+
+Passing `--client-info` reads the host and public key from the file written in
+step 3, so nothing has to be copied by hand. You can still override either one
+with `--host` or `--public-key`.
 
 Produces, in `./sub`:
 
@@ -216,7 +230,7 @@ client node.
 | UUID | `inbounds[0].users[0].uuid` |
 | Flow | `xtls-rprx-vision` |
 | SNI | `www.microsoft.com` |
-| Public key | printed by the generator |
+| Public key | `config.client.txt`, line `pbk` |
 | Short ID | `inbounds[0].tls.reality.short_id[0]` |
 | Fingerprint | `chrome` |
 

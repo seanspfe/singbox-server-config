@@ -7,3 +7,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+# client credentials written by generate-config.py
+*.client.txt
+sub/

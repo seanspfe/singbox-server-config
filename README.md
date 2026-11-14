@@ -26,7 +26,7 @@ separate `tailscaled`.
 | Path | Purpose |
 |---|---|
 | `templates/config.json.example` | the config, all credentials as placeholders |
-| `scripts/generate-config.py` | renders the template with correctly sized random secrets |
+| `scripts/generate-config.py` | renders the template, and writes `config.client.txt` with the client credentials |
 | `scripts/export-subscription.py` | share links, base64 subscription, PNG QR codes |
 | `scripts/setup-firewall.sh` | ufw rules for the four service ports |
 | `scripts/setup-bbr.sh` | fq + bbr and kernel tuning, fails if BBR is inactive |
@@ -55,11 +55,13 @@ Then export share links and QR codes for every node:
 
 ```bash
 pip install segno
-python3 scripts/export-subscription.py --config /etc/sing-box/config.json     --host relay.example.com --public-key "<the key above>" --out-dir ./sub
+python3 scripts/export-subscription.py --config /etc/sing-box/config.json     --client-info /etc/sing-box/config.client.txt --out-dir ./sub
 ```
 
 That writes per-node share URIs, a base64 subscription and one PNG QR code per
-node. Scan them with Shadowrocket, Happ, sing-box or v2rayNG.
+node. `generate-config.py` also writes `config.client.txt` (mode `0600`) with the
+REALITY public key and every client credential, so the export step needs no
+hand-copied values. Scan them with Shadowrocket, Happ, sing-box or v2rayNG.
 
 **A domain is required** for the hysteria2 and trojan inbounds: they serve a
 real TLS certificate, and a certificate needs a hostname that resolves to the

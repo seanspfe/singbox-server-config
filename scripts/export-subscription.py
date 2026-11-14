@@ -115,14 +115,35 @@ def write_qr(text: str, path: Path, segno) -> None:
 def main() -> int:
     p = argparse.ArgumentParser(description="Export share links and QR codes")
     p.add_argument("--config", required=True, help="sing-box config.json")
-    p.add_argument("--host", required=True, help="domain or public IP clients dial")
-    p.add_argument("--public-key", required=True, help="REALITY public key")
+    p.add_argument("--host", default="", help="domain or public IP clients dial")
+    p.add_argument("--public-key", default="", help="REALITY public key")
+    p.add_argument("--client-info", default="",
+                   help="read host and public key from this file instead "
+                        "(written by generate-config.py)")
     p.add_argument("--out-dir", default="./out", help="where to write links and QR codes")
     p.add_argument("--no-qr", action="store_true", help="skip QR generation (no segno needed)")
     args = p.parse_args()
 
+    host, public_key = args.host, args.public_key
+    if args.client_info:
+        text = Path(args.client_info).read_text(encoding="utf-8")
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Host to dial:") and not host:
+                value = stripped.split(":", 1)[1].strip()
+                if not value.startswith("<"):
+                    host = value
+            if stripped.startswith("pbk") and not public_key:
+                public_key = stripped.split(":", 1)[1].strip()
+    if not host:
+        print("--host is required (or pass --client-info)", file=sys.stderr)
+        return 2
+    if not public_key:
+        print("--public-key is required (or pass --client-info)", file=sys.stderr)
+        return 2
+
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
-    links = build_links(cfg, args.host, args.public_key)
+    links = build_links(cfg, host, public_key)
     if not links:
         print("no exportable inbounds found", file=sys.stderr)
         return 1
