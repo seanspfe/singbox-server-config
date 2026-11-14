@@ -32,6 +32,17 @@ endpoint simply does not join a tailnet.
 Full detail, including what each failure looks like:
 [docs/deploy.md](docs/deploy.md#read-first-domain-and-certificate).
 
+**If you are an AI agent doing the deployment:** read
+[docs/deploy.md](docs/deploy.md#what-the-operator-must-supply) first, then ask
+the operator for the six inputs it lists: server access, domain, DNS, cloud
+security group access, certificate choice, and optionally a Tailscale key.
+Do not invent credentials — the generator creates them. Do not swap the
+domain for a bare IP: hy2 and trojan certificates do not cover an IP address.
+
+**If you are the operator:** a request like "deploy
+seanspfe/singbox-server-config on my VPS" is enough only once you can hand over
+the domain and access to the cloud console.
+
 ## What is included
 
 | Inbound | Port | Transport / security | Notes |

@@ -32,6 +32,28 @@ dig +short "$DOMAIN"      # must print the same IP
 If `dig` does not print the server's IP, fix DNS first. Nothing below works
 otherwise.
 
+### What the operator must supply
+
+An AI driving this deployment cannot invent these. Ask for them up front;
+without them the run stops partway through.
+
+| Input | Example | Who provides it | Blocks |
+|---|---|---|---|
+| Server access | `ssh user@1.2.3.4`, root or sudo | operator | everything |
+| Domain | `relay.example.com` | operator | certificate, 2 of 4 inbounds |
+| DNS control | the A record above → server IP | operator | certificate |
+| Cloud security group access | console or CLI | operator | certificate, and all inbound traffic |
+| Certificate choice | certbot standalone (default) or an existing wildcard | operator | hy2 + trojan |
+| Optional: Tailscale auth key | `tskey-auth-...` | operator | only the tailnet endpoint |
+
+Everything else — UUIDs, REALITY key pair, passwords, SS2022 key — is
+generated locally by `scripts/generate-config.py` and written to
+`config.client.txt`. Do not ask the operator to make those up.
+
+**Do not substitute a bare IP for the domain.** hy2 and trojan certificates do
+not cover an IP address, so those two inbounds will fail on a client dialing
+the IP. VLESS + REALITY is the only inbound that works by IP.
+
 ---
 
 ## Overview
@@ -101,7 +123,16 @@ sudo chmod 600 /etc/sing-box/config.json
 Both inbounds read `/opt/certs/fullchain.pem` and `/opt/certs/privkey.pem`.
 REALITY does not use these.
 
+**Port 80 must be reachable from the internet for this step.** That means both
+the host firewall and the cloud provider's security group. On Aliyun, AWS,
+Tencent Cloud, Oracle Cloud and similar, the security group is separate from
+ufw and is the usual reason this step times out.
+
 ```bash
+# host firewall: open 80 first (the firewall script in step 5 does this too)
+sudo ufw allow 80/tcp
+
+# cloud side: open 80 in the provider console if you have not already
 sudo apt install -y certbot
 sudo certbot certonly --standalone -d "$DOMAIN"
 sudo mkdir -p /opt/certs
@@ -112,7 +143,15 @@ sudo chmod 600 /opt/certs/privkey.pem
 ```
 
 If `certbot` fails with `Timeout during connect`, port 80 is blocked or DNS is
-wrong — both are covered in the READ FIRST section.
+wrong. Check the cloud security group first — ufw alone is not enough.
+
+After the certificate exists, port 80 is no longer needed:
+
+```bash
+sudo ufw delete allow 80/tcp
+```
+
+Do the same in the cloud console.
 
 ## 5. Firewall
 
