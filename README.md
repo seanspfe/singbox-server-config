@@ -21,6 +21,20 @@ Outbounds are `direct` + `block`; the only route rule blocks BitTorrent.
 An embedded `tailscale` endpoint joins the node to your tailnet without a
 separate `tailscaled`.
 
+## Files
+
+| Path | Purpose |
+|---|---|
+| `templates/config.json.example` | the config, all credentials as placeholders |
+| `scripts/generate-config.py` | renders the template with correctly sized random secrets |
+| `scripts/export-subscription.py` | share links, base64 subscription, PNG QR codes |
+| `scripts/setup-firewall.sh` | ufw rules for the four service ports |
+| `scripts/setup-bbr.sh` | fq + bbr and kernel tuning, fails if BBR is inactive |
+| `scripts/mask-config.py` | masked copy for publication (whole-value replacement) |
+| `systemd/sing-box.service` | service unit |
+| `docs/deploy.md` | ordered deployment steps |
+| `docs/config.masked.json` | masked example of a real deployment |
+
 ## Quick start
 
 ```bash
@@ -36,6 +50,25 @@ sudo python3 scripts/generate-config.py --output /etc/sing-box/config.json \
 
 The script writes the file with mode `0600` and prints the REALITY public key,
 which is the only generated value the client needs.
+
+Then export share links and QR codes for every node:
+
+```bash
+pip install segno
+python3 scripts/export-subscription.py --config /etc/sing-box/config.json     --host relay.example.com --public-key "<the key above>" --out-dir ./sub
+```
+
+That writes per-node share URIs, a base64 subscription and one PNG QR code per
+node. Scan them with Shadowrocket, Happ, sing-box or v2rayNG.
+
+**A domain is required** for the hysteria2 and trojan inbounds: they serve a
+real TLS certificate, and a certificate needs a hostname that resolves to the
+server. VLESS + REALITY needs none. Read
+[docs/deploy.md](docs/deploy.md#read-first-domain-and-certificate) before
+starting.
+
+The Tailscale endpoint is optional. Leave `--tailscale-key` empty and it simply
+does not join a tailnet; the four proxy inbounds are unaffected.
 
 Full deployment steps (certificates, systemd, firewall, client config) are in
 [docs/deploy.md](docs/deploy.md).
