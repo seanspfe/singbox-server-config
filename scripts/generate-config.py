@@ -106,11 +106,7 @@ def build(args):
         raise SystemExit("unrendered placeholders remain:\n" + "\n".join(left))
 
     cfg = json.loads(template)
-    cfg["_meta"] = {
-        "generated_by": "scripts/generate-config.py",
-        "reality_public_key": pub,
-    }
-    return cfg
+    return cfg, pub
 
 
 def main() -> int:
@@ -129,15 +125,16 @@ def main() -> int:
     p.add_argument("--api-secret", default="")
     args = p.parse_args()
 
-    cfg = build(args)
+    cfg, pub = build(args)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     os.chmod(out, 0o600)
 
-    print("wrote " + str(out))
-    print("REALITY public key: " + cfg["_meta"]["reality_public_key"])
-    print("keep that public key for the client configuration")
+    print("wrote " + str(out), file=sys.stderr)
+    print("", file=sys.stderr)
+    print("REALITY public key: " + pub, file=sys.stderr)
+    print("keep that public key for the client configuration", file=sys.stderr)
     return 0
 
 
