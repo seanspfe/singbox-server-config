@@ -1,0 +1,9 @@
+# rendered configs contain live credentials
+config.json
+*.rendered.json
+out.json
+*.log
+__pycache__/
+*.pyc
+.venv/
+venv/

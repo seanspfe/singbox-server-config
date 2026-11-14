@@ -1,0 +1,101 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true,
+    "output": "/var/log/sing-box/sing-box.log"
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-reality-in",
+      "listen": "::",
+      "listen_port": 8443,
+      "users": [
+        { "uuid": "%%VLESS_UUID%%", "flow": "xtls-rprx-vision" }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "www.microsoft.com",
+        "reality": {
+          "enabled": true,
+          "handshake": { "server": "www.microsoft.com", "server_port": 443 },
+          "private_key": "%%REALITY_PRIVATE_KEY%%",
+          "short_id": [ "%%REALITY_SHORT_ID%%" ]
+        }
+      }
+    },
+    {
+      "type": "hysteria2",
+      "tag": "hysteria2-in",
+      "listen": "::",
+      "listen_port": 4443,
+      "users": [ { "password": "%%HY2_PASSWORD%%" } ],
+      "masquerade": "https://www.microsoft.com",
+      "tls": {
+        "enabled": true,
+        "alpn": [ "h3" ],
+        "certificate_path": "/opt/certs/fullchain.pem",
+        "key_path": "/opt/certs/privkey.pem"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "trojan-in",
+      "listen": "::",
+      "listen_port": 13159,
+      "users": [ { "password": "%%TROJAN_PASSWORD%%" } ],
+      "tls": {
+        "enabled": true,
+        "alpn": [ "h2", "http/1.1" ],
+        "certificate_path": "/opt/certs/fullchain.pem",
+        "key_path": "/opt/certs/privkey.pem"
+      }
+    },
+    {
+      "type": "shadowsocks",
+      "tag": "ss2022-in",
+      "listen": "::",
+      "listen_port": 2096,
+      "method": "2022-blake3-aes-128-gcm",
+      "password": "%%SS2022_PASSWORD%%"
+    }
+  ],
+  "outbounds": [
+    { "type": "direct", "tag": "direct" },
+    { "type": "block", "tag": "block" }
+  ],
+  "route": {
+    "rules": [ { "protocol": [ "bittorrent" ], "outbound": "block" } ]
+  },
+  "endpoints": [
+    {
+      "type": "tailscale",
+      "tag": "ts-ep",
+      "hostname": "%%TAILSCALE_HOSTNAME%%",
+      "accept_routes": true,
+      "auth_key": "%%TAILSCALE_AUTH_KEY%%",
+      "state_directory": "/var/lib/sing-box/tailscale"
+    }
+  ],
+  "experimental": {
+    "clash_api": {
+      "external_controller": "127.0.0.1:9999",
+      "secret": "%%CLASH_API_SECRET%%",
+      "default_mode": "rule",
+      "external_ui": "/var/lib/sing-box/ui"
+    },
+    "cache_file": { "enabled": true, "path": "/var/lib/sing-box/cache.db", "store_dns": true }
+  },
+  "services": [
+    {
+      "type": "api",
+      "tag": "api",
+      "listen": "127.0.0.1",
+      "listen_port": 9091,
+      "secret": "%%API_SECRET%%",
+      "dashboard": true,
+      "access_control_allow_private_network": true
+    }
+  ]
+}
+
