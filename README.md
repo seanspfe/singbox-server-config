@@ -8,6 +8,30 @@ The committed template contains **no real credentials**. Every secret is a
 placeholder; `scripts/generate-config.py` fills them in with correctly sized
 random values for you.
 
+## Requirements
+
+Read this before running anything. Two of the four inbounds are **blocking** on
+infrastructure you must provide.
+
+| Requirement | Needed by | If missing |
+|---|---|---|
+| **A domain** you control | hysteria2, trojan | those two inbounds refuse to start |
+| **DNS A record**: domain -> server public IP | certificate issuance | `certbot` fails |
+| **TCP 80 open** while issuing | ACME HTTP-01 | certificate issuance fails |
+| **A certificate** at `/opt/certs/` | hysteria2, trojan | `permission denied` on start |
+| Linux server with systemd, root or sudo | everything | n/a |
+| sing-box **1.11+** | `tailscale` endpoint | endpoint type is rejected |
+
+VLESS + REALITY needs **no domain and no certificate** — it borrows the TLS
+handshake of `www.microsoft.com`. If you want a certificate-free node, keep
+only that inbound.
+
+The Tailscale auth key is optional: leave `--tailscale-key` empty and the
+endpoint simply does not join a tailnet.
+
+Full detail, including what each failure looks like:
+[docs/deploy.md](docs/deploy.md#read-first-domain-and-certificate).
+
 ## What is included
 
 | Inbound | Port | Transport / security | Notes |
